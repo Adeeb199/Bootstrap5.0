@@ -66,7 +66,6 @@ let layout = JSON.parse(localStorage.getItem("layout")) || [];
 let deletedIds = JSON.parse(localStorage.getItem("deletedIds")) || [];
 let elementIdCounter = layout.length ? Math.max(...getAllIds(layout)) + 1 : 1;
 
-// Restore classes for persisted elements
 function restoreClasses(arr) {
   arr.forEach(el => {
     if (!Array.isArray(el.classes)) el.classes = [];
@@ -76,7 +75,7 @@ function restoreClasses(arr) {
 }
 restoreClasses(layout);
 
-// ----- Helper Functions -----
+// ----- Helpers -----
 function getAllIds(arr) {
   let ids = [];
   arr.forEach(e => {
@@ -142,57 +141,43 @@ function createElement(type, content = "") {
 }
 
 // ----- Rendering -----
-// ----- Rendering -----
 function renderElement(el) {
-  let box;
+  const wrapper = document.createElement("div");
+  wrapper.classList.add("element-box", "position-relative", "p-2");
 
+  let actualEl;
   if (el.type === "title" || el.type === "desc") {
-    // ✅ wrapper div for controls and label
-    box = document.createElement("div");
-    box.classList.add("element-box", "position-relative", "p-2");
-
     const tag = el.type === "title" ? "h3" : "p";
-    const textEl = document.createElement(tag);
-    textEl.textContent = el.content;
-    el.classes.forEach(cls => textEl.classList.add(cls));
-    textEl.dataset.innerEl = "true"; // marker for identification
-    box.appendChild(textEl);
-
+    actualEl = document.createElement(tag);
+    actualEl.textContent = el.content;
   } else if (el.type === "img") {
-    box = document.createElement("div");
-    box.classList.add("element-box", "position-relative", "text-center", "p-2");
-
-    const img = document.createElement("img");
-    img.src = el.content;
-    el.classes.forEach(cls => img.classList.add(cls));
-    img.dataset.innerEl = "true";
-    box.appendChild(img);
-
+    actualEl = document.createElement("img");
+    actualEl.src = el.content;
   } else {
-    box = document.createElement("div");
-    box.classList.add("element-box");
-    el.classes.forEach(cls => box.classList.add(cls));
+    actualEl = document.createElement("div");
   }
 
-  // Add class label
+  actualEl.className = "";
+  el.classes.forEach(cls => actualEl.classList.add(cls));
+  actualEl.dataset.realElement = "true";
+  wrapper.appendChild(actualEl);
+
   const clsLabel = document.createElement("span");
   clsLabel.className = "element-class-label";
   clsLabel.textContent = "Classes: " + el.classes.join(" ");
-  box.appendChild(clsLabel);
+  wrapper.appendChild(clsLabel);
 
-  // Render children recursively
   if (el.children && el.children.length) {
-    el.children.forEach(c => box.appendChild(renderElement(c)));
+    el.children.forEach(c => actualEl.appendChild(renderElement(c)));
   }
 
-  // Controls
   const controls = document.createElement("div");
   controls.className = "element-controls";
 
   const classBtn = document.createElement("button");
   classBtn.textContent = "Classes";
   classBtn.className = "btn btn-sm btn-secondary";
-  classBtn.onclick = e => { e.stopPropagation(); openClassSelector(el, box, clsLabel); };
+  classBtn.onclick = e => { e.stopPropagation(); openClassSelector(el, actualEl, clsLabel); };
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "X";
@@ -201,10 +186,11 @@ function renderElement(el) {
 
   controls.appendChild(classBtn);
   controls.appendChild(deleteBtn);
-  box.appendChild(controls);
+  wrapper.appendChild(controls);
 
-  return box;
+  return wrapper;
 }
+
 // ----- Class Selector -----
 function openClassSelector(el, box, clsLabel) {
   document.querySelectorAll(".class-popup").forEach(p => p.remove());
@@ -237,7 +223,6 @@ function openClassSelector(el, box, clsLabel) {
     btn.textContent = cls;
     btn.className = "class-btn" + (el.classes.includes(cls) ? " active" : "");
     btn.onclick = () => {
-      // toggle class
       if (el.classes.includes(cls)) el.classes = el.classes.filter(c => c !== cls);
       else el.classes.push(cls);
 
@@ -245,18 +230,9 @@ function openClassSelector(el, box, clsLabel) {
         c.classList.toggle("active", el.classes.includes(c.textContent))
       );
 
-      // ✅ Apply updated classes correctly
-      let targetEl = box.querySelector("[data-inner-el='true']");
-      if (targetEl) {
-        targetEl.className = "";
-        el.classes.forEach(c => targetEl.classList.add(c));
-      } else {
-        // for div, row, col
-        box.className = "element-box";
-        el.classes.forEach(c => box.classList.add(c));
-      }
+      box.className = "";
+      el.classes.forEach(c => box.classList.add(c));
 
-      // Update label + HTML code
       clsLabel.textContent = "Classes: " + el.classes.join(" ");
       saveLayout();
       codeBlock.textContent = sortElementsRecursively(layout).map(generateHTML).join("\n");
@@ -305,8 +281,6 @@ function generateHTML(el){
   if(["div","row","col"].includes(el.type)) return `<div id="id-${el.id}" class="${el.classes.join(" ")}">\n${el.children.map(generateHTML).join("\n")}\n</div>`;
   return "";
 }
-
-
 
 // ----- Event Listeners -----
 elementTypeSelect.addEventListener("change",()=>{
